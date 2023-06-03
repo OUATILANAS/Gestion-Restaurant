@@ -1,36 +1,23 @@
-#### Stage 1: Build the application
-FROM openjdk:8-jdk-alpine as build
+FROM openjdk:17-slim
 
-# Set the current working directory inside the image
+# Set environment variables for MySQL connection
+ENV DB_HOST=mysql-host
+ENV DB_PORT=3306
+ENV DB_NAME=testdb
+ENV DB_USER=root
+ENV DB_PASSWORD=
+
+# Install MySQL client
+RUN apt-get update && apt-get install -y default-mysql-client
+
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy maven executable to the image
-COPY mvnw .
-COPY .mvn .mvn
+# Copy the application JAR file to the container
+COPY ./target/polls-0.0.1-SNAPSHOT.jar polls-0.0.1-SNAPSHOT.jar
 
-# Copy the pom.xml file
-COPY pom.xml .
+# Expose the port your application listens on
+EXPOSE 8080
 
-# Build all the dependencies in preparation to go offline. 
-# This is a separate step so the dependencies will be cached unless 
-# the pom.xml file has changed.
-RUN ./mvnw dependency:go-offline -B
-
-# Copy the project source
-COPY src src
-
-# Package the application
-RUN ./mvnw package -DskipTests
-RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
-
-#### Stage 2: A minimal docker image with command to run the app 
-FROM openjdk:8-jre-alpine
-
-ARG DEPENDENCY=/app/target/dependency
-
-# Copy project dependencies from the build stage
-COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
-COPY --from=build ${DEPENDENCY}/META-INF /app/META-INF
-COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
-
-ENTRYPOINT ["java","-cp","app:app/lib/*","com.example.restau.PollsApplication"]
+# Run the application
+CMD ["java", "-jar", "polls-0.0.1-SNAPSHOT.jar"]
